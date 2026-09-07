@@ -36,10 +36,12 @@ html, body{
 }
 
 .brand-banner{
-  height: 110px;
-  background-image: url("assets/fond_ifsi.png");
-  background-size: cover;
-  background-position: left 30%;
+  height: 90px;
+  background-color: #FFFFFF;
+  background-image: url("assets/logo_ifsi.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: left center;
 }
 
 .app{
