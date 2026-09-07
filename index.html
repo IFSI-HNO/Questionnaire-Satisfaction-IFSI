@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Questionnaire de satisfaction — Stage IFSI</title>
+
+<!-- Icône utilisée quand l'étudiant ajoute la page à l'écran d'accueil de son téléphone -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Quest. IFSI">
+<meta name="theme-color" content="#1E4591">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <div class="brand-banner" role="img" aria-label="Institut de Formations en Santé — Hôpitaux Nord-Ouest"></div>
+  <header class="app-header">
+    <span class="app-header__title">Questionnaire de stage</span>
+  </header>
+
+  <!-- ============== ÉCRAN 1 : IDENTIFICATION ============== -->
+  <section id="screen-identification" class="screen">
+    <div class="card">
+      <h1>Avant de commencer</h1>
+      <p class="intro">Ce questionnaire est anonyme : aucune information nominative ne vous sera demandée. Merci de renseigner les éléments de votre stage.</p>
+
+      <form id="form-identification" novalidate>
+
+        <label class="field">
+          <span class="field__label">Promotion</span>
+          <select id="promotion" required>
+            <option value="" disabled selected>Choisir…</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Type de formation</span>
+          <select id="type_formation" required>
+            <option value="" disabled selected>Choisir…</option>
+          </select>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field__label">Début de stage</span>
+            <input type="date" id="date_debut_stage" required>
+          </label>
+          <label class="field">
+            <span class="field__label">Fin de stage</span>
+            <input type="date" id="date_fin_stage" required>
+          </label>
+        </div>
+        <p class="field-hint" id="hint-dates"></p>
+
+        <label class="field">
+          <span class="field__label">Semestre de formation</span>
+          <select id="semestre" required>
+            <option value="" disabled selected>Choisir…</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Établissement d'origine (votre IFSI / institut)</span>
+          <input type="text" id="etablissement_origine" required autocomplete="off">
+        </label>
+
+        <label class="field">
+          <span class="field__label">Établissement du stage</span>
+          <select id="etablissement_stage" required>
+            <option value="" disabled selected>Choisir…</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Service</span>
+          <select id="service" required disabled>
+            <option value="" disabled selected>Choisir d'abord l'établissement…</option>
+          </select>
+        </label>
+
+        <p class="form-error" id="identification-error" role="alert" hidden></p>
+
+        <button type="submit" class="btn btn--primary" id="btn-start">
+          Accéder au questionnaire
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ============== ÉCRAN 2 : QUESTIONNAIRE ============== -->
+  <section id="screen-questionnaire" class="screen" hidden>
+    <div class="progress" role="progressbar" aria-label="Progression du questionnaire">
+      <div class="progress__ticks" id="progress-ticks"></div>
+      <span class="progress__label" id="progress-label">Question 1 / 1</span>
+    </div>
+
+    <div class="card card--question">
+      <h2 id="question-text"></h2>
+      <div id="question-input" class="question-input"></div>
+      <p class="form-error" id="question-error" role="alert" hidden></p>
+
+      <div class="question-actions">
+        <button type="button" class="btn btn--ghost" id="btn-prev">Précédent</button>
+        <button type="button" class="btn btn--primary" id="btn-next">Question suivante</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== ÉCRAN 3 : ENVOI EN COURS ============== -->
+  <section id="screen-sending" class="screen" hidden>
+    <div class="card card--center">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Envoi de vos réponses…</p>
+    </div>
+  </section>
+
+  <!-- ============== ÉCRAN 4 : CONFIRMATION ============== -->
+  <section id="screen-done" class="screen" hidden>
+    <div class="card card--center">
+      <span class="check-mark" aria-hidden="true">&#10003;</span>
+      <h2>Merci</h2>
+      <p>Votre questionnaire a bien été transmis à l'IFSI.</p>
+    </div>
+  </section>
+
+  <!-- ============== ÉCRAN ERREUR RÉSEAU ============== -->
+  <section id="screen-error" class="screen" hidden>
+    <div class="card card--center">
+      <h2>Envoi impossible</h2>
+      <p id="error-message">La connexion a échoué. Vérifiez votre réseau puis réessayez.</p>
+      <button type="button" class="btn btn--primary" id="btn-retry">Réessayer</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
