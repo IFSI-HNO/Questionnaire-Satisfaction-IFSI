@@ -43,6 +43,7 @@ const state = {
     semestres: [],
     etablissements: [],
     services: [],           // tous les services ; filtrés par établissement à l'affichage
+    specialites: [],
     questionnaireVersionId: null,
     questions: []
   },
@@ -54,7 +55,7 @@ const state = {
 const els = {};
 ["screen-identification","screen-questionnaire","screen-sending","screen-done","screen-error",
  "form-identification","promotion","type_formation","date_debut_stage","date_fin_stage",
- "semestre","etablissement_origine","etablissement_stage","service",
+ "semestre","etablissement_origine","etablissement_stage","service","specialite",
  "identification-error","hint-dates",
  "progress-ticks","progress-label","question-text","question-input","question-error",
  "btn-prev","btn-next","btn-retry","error-message"
@@ -69,12 +70,13 @@ function showScreen(id) {
    Chargement des données de référence
    ============================================================ */
 async function loadReferenceData() {
-  const [promotions, typesFormation, semestres, etablissements, services, versions] = await Promise.all([
+  const [promotions, typesFormation, semestres, etablissements, services, specialites, versions] = await Promise.all([
     Supa.select("promotions", "select=id,annee_debut,annee_fin&order=annee_debut.desc"),
     Supa.select("types_formation", "select=id,libelle&actif=eq.true&order=libelle.asc"),
     Supa.select("semestres", "select=id,libelle&actif=eq.true&order=ordre.asc"),
     Supa.select("etablissements", "select=id,nom&actif=eq.true&order=nom.asc"),
     Supa.select("services", "select=id,etablissement_id,nom&actif=eq.true&order=nom.asc"),
+    Supa.select("specialites", "select=id,nom&actif=eq.true&order=nom.asc"),
     Supa.select("questionnaires_versions", "select=id&actif=eq.true&limit=1")
   ]);
 
@@ -83,6 +85,7 @@ async function loadReferenceData() {
   state.refs.semestres = semestres;
   state.refs.etablissements = etablissements;
   state.refs.services = services;
+  state.refs.specialites = specialites;
 
   if (!versions.length) {
     throw new Error("Aucun questionnaire actif n'est configuré pour le moment.");
@@ -98,6 +101,7 @@ async function loadReferenceData() {
   populateSelect(els.type_formation, typesFormation, t => t.libelle, t => t.id);
   populateSelect(els.semestre, semestres, s => s.libelle, s => s.id);
   populateSelect(els.etablissement_stage, etablissements, e => e.nom, e => e.id);
+  populateSelect(els.specialite, specialites, s => s.nom, s => s.id);
 }
 
 function populateSelect(selectEl, items, labelFn, valueFn) {
@@ -160,6 +164,7 @@ els.form_identification.addEventListener("submit", (e) => {
     etablissement_origine: els.etablissement_origine.value.trim(),
     etablissement_stage_id: Number(els.etablissement_stage.value),
     service_id: Number(els.service.value),
+    specialite_id: Number(els.specialite.value),
     questionnaire_version_id: state.refs.questionnaireVersionId
   };
 
@@ -290,9 +295,10 @@ els["btn-next"].addEventListener("click", async () => {
 async function submitQuestionnaire() {
   showScreen("screen-sending");
   try {
-    const [session] = await Supa.insert("sessions_reponses", [state.identification], { returnRepresentation: true });
+    const sessionId = crypto.randomUUID();
+    await Supa.insert("sessions_reponses", [{ id: sessionId, ...state.identification }]);
     const details = state.refs.questions.map(q => ({
-      session_reponse_id: session.id,
+      session_reponse_id: sessionId,
       question_id: q.id,
       valeur: Array.isArray(state.answers[q.id]) ? state.answers[q.id].join(", ") : String(state.answers[q.id] ?? "")
     }));
