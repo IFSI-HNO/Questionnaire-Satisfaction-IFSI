@@ -28,7 +28,14 @@ const Supa = {
       }),
       body: JSON.stringify(rows)
     });
-    if (!res.ok) throw new Error(`Envoi impossible (${table})`);
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        detail = body.message || body.hint || body.details || JSON.stringify(body);
+      } catch (e) { /* réponse non-JSON, on garde le message générique */ }
+      throw new Error(`Envoi impossible (${table})${detail ? " : " + detail : ""}`);
+    }
     return returnRepresentation ? res.json() : null;
   }
 };
