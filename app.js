@@ -45,12 +45,11 @@ const Supa = {
    ============================================================ */
 const state = {
   refs: {
-    promotions: [],
+    promotions: [],         // toutes les promotions ; filtrées par type de formation à l'affichage
     typesFormation: [],
     semestres: [],
     etablissements: [],
     services: [],           // tous les services ; filtrés par établissement à l'affichage
-    specialites: [],
     questionnaireVersionId: null,
     questions: []
   },
@@ -62,7 +61,7 @@ const state = {
 const els = {};
 ["screen-identification","screen-questionnaire","screen-sending","screen-done","screen-error",
  "form-identification","promotion","type_formation","date_debut_stage","date_fin_stage",
- "semestre","etablissement_origine","etablissement_stage","service","specialite",
+ "semestre","etablissement_origine","etablissement_stage","service",
  "identification-error","hint-dates",
  "progress-ticks","progress-label","question-text","question-input","question-error",
  "btn-prev","btn-next","btn-retry","error-message"
@@ -77,13 +76,12 @@ function showScreen(id) {
    Chargement des données de référence
    ============================================================ */
 async function loadReferenceData() {
-  const [promotions, typesFormation, semestres, etablissements, services, specialites, versions] = await Promise.all([
-    Supa.select("promotions", "select=id,annee_debut,annee_fin&order=annee_debut.desc"),
+  const [promotions, typesFormation, semestres, etablissements, services, versions] = await Promise.all([
+    Supa.select("promotions", "select=id,type_formation_id,annee_debut,annee_fin&actif=eq.true&order=annee_debut.desc"),
     Supa.select("types_formation", "select=id,libelle&actif=eq.true&order=libelle.asc"),
     Supa.select("semestres", "select=id,libelle&actif=eq.true&order=ordre.asc"),
     Supa.select("etablissements", "select=id,nom&actif=eq.true&order=nom.asc"),
     Supa.select("services", "select=id,etablissement_id,nom&actif=eq.true&order=nom.asc"),
-    Supa.select("specialites", "select=id,nom&actif=eq.true&order=nom.asc"),
     Supa.select("questionnaires_versions", "select=id&actif=eq.true&limit=1")
   ]);
 
@@ -92,7 +90,6 @@ async function loadReferenceData() {
   state.refs.semestres = semestres;
   state.refs.etablissements = etablissements;
   state.refs.services = services;
-  state.refs.specialites = specialites;
 
   if (!versions.length) {
     throw new Error("Aucun questionnaire actif n'est configuré pour le moment.");
@@ -104,11 +101,9 @@ async function loadReferenceData() {
     `select=id,ordre,texte,type_reponse,options,obligatoire&questionnaire_version_id=eq.${versions[0].id}&order=ordre.asc`
   );
 
-  populateSelect(els.promotion, promotions, p => `${p.annee_debut}–${p.annee_fin}`, p => p.id);
   populateSelect(els.type_formation, typesFormation, t => t.libelle, t => t.id);
   populateSelect(els.semestre, semestres, s => s.libelle, s => s.id);
   populateSelect(els.etablissement_stage, etablissements, e => e.nom, e => e.id);
-  populateSelect(els.specialite, specialites, s => s.nom, s => s.id);
 }
 
 function populateSelect(selectEl, items, labelFn, valueFn) {
@@ -119,6 +114,29 @@ function populateSelect(selectEl, items, labelFn, valueFn) {
     selectEl.appendChild(opt);
   });
 }
+
+els.type_formation.addEventListener("change", () => {
+  const typeId = Number(els.type_formation.value);
+  const filtered = state.refs.promotions.filter(p => p.type_formation_id === typeId);
+  els.promotion.innerHTML = "";
+  if (!filtered.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "Aucune promotion configurée pour ce type de formation";
+    opt.disabled = true;
+    opt.selected = true;
+    els.promotion.appendChild(opt);
+    els.promotion.disabled = true;
+    return;
+  }
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.textContent = "Choisir…";
+  els.promotion.appendChild(placeholder);
+  populateSelect(els.promotion, filtered, p => `${p.annee_debut}–${p.annee_fin}`, p => p.id);
+  els.promotion.disabled = false;
+});
 
 els.etablissement_stage.addEventListener("change", () => {
   const etabId = Number(els.etablissement_stage.value);
@@ -171,7 +189,6 @@ els.form_identification.addEventListener("submit", (e) => {
     etablissement_origine: els.etablissement_origine.value.trim(),
     etablissement_stage_id: Number(els.etablissement_stage.value),
     service_id: Number(els.service.value),
-    specialite_id: Number(els.specialite.value),
     questionnaire_version_id: state.refs.questionnaireVersionId
   };
 
