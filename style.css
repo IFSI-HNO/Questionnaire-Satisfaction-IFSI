@@ -69,6 +69,12 @@ html, body{
   display: flex;
   flex-direction: column;
 }
+/* Priorité forcée : sans cette règle, la classe .screen (display:flex) l'emportait
+   sur l'attribut hidden, ce qui laissait tous les écrans visibles en même temps
+   les uns sous les autres au lieu de se remplacer. */
+.screen[hidden]{
+  display: none;
+}
 
 .card{
   background: var(--surface);
