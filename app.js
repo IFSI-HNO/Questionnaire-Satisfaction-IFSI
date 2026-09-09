@@ -76,14 +76,15 @@ function showScreen(id) {
    Chargement des données de référence
    ============================================================ */
 async function loadReferenceData() {
-  const [promotions, typesFormation, semestres, etablissements, services, versions] = await Promise.all([
+  const [promotions, typesFormation, semestres, etablissements, services] = await Promise.all([
     Supa.select("promotions", "select=id,type_formation_id,annee_debut,annee_fin&actif=eq.true&order=annee_debut.desc"),
     Supa.select("types_formation", "select=id,libelle&actif=eq.true&order=libelle.asc"),
-    Supa.select("semestres", "select=id,libelle&actif=eq.true&order=ordre.asc"),
+    Supa.select("semestres", "select=id,type_formation_id,libelle&actif=eq.true&order=ordre.asc"),
     Supa.select("etablissements", "select=id,nom&actif=eq.true&order=nom.asc"),
-    Supa.select("services", "select=id,etablissement_id,nom&actif=eq.true&order=nom.asc"),
-    Supa.select("questionnaires_versions", "select=id&actif=eq.true&limit=1")
+    Supa.select("services", "select=id,etablissement_id,nom&actif=eq.true&order=nom.asc")
   ]);
+  // Le questionnaire (version + questions) n'est plus chargé ici : il dépend du type de
+  // formation, choisi seulement à l'écran suivant. Voir chargerQuestionnairePourFormation().
 
   state.refs.promotions = promotions;
   state.refs.typesFormation = typesFormation;
@@ -91,18 +92,7 @@ async function loadReferenceData() {
   state.refs.etablissements = etablissements;
   state.refs.services = services;
 
-  if (!versions.length) {
-    throw new Error("Aucun questionnaire actif n'est configuré pour le moment.");
-  }
-  state.refs.questionnaireVersionId = versions[0].id;
-
-  state.refs.questions = await Supa.select(
-    "questions",
-    `select=id,ordre,texte,type_reponse,options,obligatoire&questionnaire_version_id=eq.${versions[0].id}&order=ordre.asc`
-  );
-
   populateSelect(els.type_formation, typesFormation, t => t.libelle, t => t.id);
-  populateSelect(els.semestre, semestres, s => s.libelle, s => s.id);
   populateSelect(els.etablissement_stage, etablissements, e => e.nom, e => e.id);
 }
 
@@ -115,27 +105,68 @@ function populateSelect(selectEl, items, labelFn, valueFn) {
   });
 }
 
+const TYPES_AVEC_PROMOTION = ["AS", "IDE"];  // seuls ces types demandent une promotion
+
 els.type_formation.addEventListener("change", () => {
   const typeId = Number(els.type_formation.value);
-  const filtered = state.refs.promotions.filter(p => p.type_formation_id === typeId);
+  const typeInfo = state.refs.typesFormation.find(t => t.id === typeId);
+  const requiresPromotion = !!typeInfo && TYPES_AVEC_PROMOTION.includes((typeInfo.libelle || "").trim());
+
+  // --- Promotion : uniquement pour AS/IDE ---
   els.promotion.innerHTML = "";
-  if (!filtered.length) {
+  if (!requiresPromotion) {
     const opt = document.createElement("option");
-    opt.textContent = "Aucune promotion configurée pour ce type de formation";
+    opt.textContent = "Non applicable pour ce type de formation";
     opt.disabled = true;
     opt.selected = true;
     els.promotion.appendChild(opt);
     els.promotion.disabled = true;
-    return;
+    els.promotion.required = false;
+  } else {
+    const filteredPromotions = state.refs.promotions.filter(p => p.type_formation_id === typeId);
+    if (!filteredPromotions.length) {
+      const opt = document.createElement("option");
+      opt.textContent = "Aucune promotion configurée pour ce type de formation";
+      opt.disabled = true;
+      opt.selected = true;
+      els.promotion.appendChild(opt);
+      els.promotion.disabled = true;
+      els.promotion.required = false;
+    } else {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = "Choisir…";
+      els.promotion.appendChild(placeholder);
+      populateSelect(els.promotion, filteredPromotions, p => `${p.annee_debut}–${p.annee_fin}`, p => p.id);
+      els.promotion.disabled = false;
+      els.promotion.required = true;
+    }
   }
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.disabled = true;
-  placeholder.selected = true;
-  placeholder.textContent = "Choisir…";
-  els.promotion.appendChild(placeholder);
-  populateSelect(els.promotion, filtered, p => `${p.annee_debut}–${p.annee_fin}`, p => p.id);
-  els.promotion.disabled = false;
+
+  // --- Semestre : dépend toujours du type de formation, pour toutes les formations ---
+  els.semestre.innerHTML = "";
+  const filteredSemestres = state.refs.semestres.filter(s => s.type_formation_id === typeId);
+  if (!filteredSemestres.length) {
+    const opt = document.createElement("option");
+    opt.textContent = "Aucun semestre configuré pour ce type de formation";
+    opt.disabled = true;
+    opt.selected = true;
+    els.semestre.appendChild(opt);
+    els.semestre.disabled = true;
+    els.semestre.required = false;
+  } else {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    placeholder.textContent = "Choisir…";
+    els.semestre.appendChild(placeholder);
+    populateSelect(els.semestre, filteredSemestres, s => s.libelle, s => s.id);
+    els.semestre.disabled = false;
+    els.semestre.required = true;
+  }
 });
 
 els.etablissement_stage.addEventListener("change", () => {
@@ -164,8 +195,24 @@ els.etablissement_stage.addEventListener("change", () => {
 /* ============================================================
    Écran 1 : identification
    ============================================================ */
+
+async function chargerQuestionnairePourFormation(typeFormationId) {
+  const versions = await Supa.select(
+    "questionnaires_versions",
+    `select=id&actif=eq.true&type_formation_id=eq.${typeFormationId}&limit=1`
+  );
+  if (!versions.length) {
+    throw new Error("Aucun questionnaire n'est configuré pour ce type de formation pour le moment.");
+  }
+  state.refs.questionnaireVersionId = versions[0].id;
+  state.refs.questions = await Supa.select(
+    "questions",
+    `select=id,ordre,texte,type_reponse,options,obligatoire&questionnaire_version_id=eq.${versions[0].id}&order=ordre.asc`
+  );
+}
+
 els.form_identification = els["form-identification"];
-els.form_identification.addEventListener("submit", (e) => {
+els.form_identification.addEventListener("submit", async (e) => {
   e.preventDefault();
   els["identification-error"].hidden = true;
 
@@ -180,9 +227,27 @@ els.form_identification.addEventListener("submit", (e) => {
     return;
   }
 
+  const btnStart = document.getElementById("btn-start");
+  const texteOriginal = btnStart.textContent;
+  btnStart.disabled = true;
+  btnStart.textContent = "Chargement du questionnaire…";
+
+  const typeFormationId = Number(els.type_formation.value);
+  try {
+    await chargerQuestionnairePourFormation(typeFormationId);
+  } catch (err) {
+    els["identification-error"].textContent = err.message || "Impossible de charger le questionnaire pour cette formation.";
+    els["identification-error"].hidden = false;
+    btnStart.disabled = false;
+    btnStart.textContent = texteOriginal;
+    return;
+  }
+  btnStart.disabled = false;
+  btnStart.textContent = texteOriginal;
+
   state.identification = {
-    promotion_id: Number(els.promotion.value),
-    type_formation_id: Number(els.type_formation.value),
+    promotion_id: els.promotion.disabled ? null : Number(els.promotion.value),
+    type_formation_id: typeFormationId,
     date_debut_stage: debut,
     date_fin_stage: fin,
     semestre_id: Number(els.semestre.value),
@@ -192,6 +257,7 @@ els.form_identification.addEventListener("submit", (e) => {
     questionnaire_version_id: state.refs.questionnaireVersionId
   };
 
+  state.answers = {};
   state.currentQuestionIndex = 0;
   showScreen("screen-questionnaire");
   renderQuestion();
