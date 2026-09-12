@@ -193,6 +193,40 @@ els.etablissement_stage.addEventListener("change", () => {
 });
 
 /* ============================================================
+   Anti double-envoi (mémoire locale du téléphone, pas du serveur) :
+   empêche de refaire le MÊME stage (mêmes dates/établissement/service/
+   formation) depuis cet appareil. Un stage différent reste toujours
+   possible. Contournable (navigation privée, autre appareil, effacement
+   des données du site) — c'est un frein à l'erreur, pas une garantie.
+   ============================================================ */
+const STAGES_COMPLETES_KEY = "ifsi_stages_completes";
+
+function signatureDuStage(id) {
+  return [
+    id.type_formation_id, id.promotion_id, id.date_debut_stage,
+    id.date_fin_stage, id.etablissement_stage_id, id.service_id
+  ].join("|");
+}
+
+function stagesCompletes() {
+  try {
+    return JSON.parse(localStorage.getItem(STAGES_COMPLETES_KEY) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function marquerStageComplete(signature) {
+  try {
+    const liste = stagesCompletes();
+    if (!liste.includes(signature)) {
+      liste.push(signature);
+      localStorage.setItem(STAGES_COMPLETES_KEY, JSON.stringify(liste));
+    }
+  } catch (e) { /* stockage indisponible (navigation privée stricte) : on ignore silencieusement */ }
+}
+
+/* ============================================================
    Écran 1 : identification
    ============================================================ */
 
@@ -227,12 +261,30 @@ els.form_identification.addEventListener("submit", async (e) => {
     return;
   }
 
+  const typeFormationId = Number(els.type_formation.value);
+  const identificationCandidate = {
+    promotion_id: els.promotion.disabled ? null : Number(els.promotion.value),
+    type_formation_id: typeFormationId,
+    date_debut_stage: debut,
+    date_fin_stage: fin,
+    etablissement_stage_id: Number(els.etablissement_stage.value),
+    service_id: Number(els.service.value),
+  };
+  const signature = signatureDuStage(identificationCandidate);
+  if (stagesCompletes().includes(signature)) {
+    els["identification-error"].textContent =
+      "Ce questionnaire a déjà été rempli depuis cet appareil pour ce stage précis (mêmes dates, " +
+      "même établissement, même service). Si c'est en réalité un stage différent, vérifie les " +
+      "informations saisies ci-dessus.";
+    els["identification-error"].hidden = false;
+    return;
+  }
+
   const btnStart = document.getElementById("btn-start");
   const texteOriginal = btnStart.textContent;
   btnStart.disabled = true;
   btnStart.textContent = "Chargement du questionnaire…";
 
-  const typeFormationId = Number(els.type_formation.value);
   try {
     await chargerQuestionnairePourFormation(typeFormationId);
   } catch (err) {
@@ -246,16 +298,12 @@ els.form_identification.addEventListener("submit", async (e) => {
   btnStart.textContent = texteOriginal;
 
   state.identification = {
-    promotion_id: els.promotion.disabled ? null : Number(els.promotion.value),
-    type_formation_id: typeFormationId,
-    date_debut_stage: debut,
-    date_fin_stage: fin,
+    ...identificationCandidate,
     semestre_id: Number(els.semestre.value),
     etablissement_origine: els.etablissement_origine.value.trim(),
-    etablissement_stage_id: Number(els.etablissement_stage.value),
-    service_id: Number(els.service.value),
     questionnaire_version_id: state.refs.questionnaireVersionId
   };
+  state.stageSignature = signature;
 
   state.answers = {};
   state.currentQuestionIndex = 0;
@@ -393,6 +441,7 @@ async function submitQuestionnaire() {
       valeur: Array.isArray(state.answers[q.id]) ? state.answers[q.id].join(", ") : String(state.answers[q.id] ?? "")
     }));
     await Supa.insert("reponses_details", details);
+    marquerStageComplete(state.stageSignature);
     showScreen("screen-done");
   } catch (err) {
     els["error-message"].textContent = err.message || "La connexion a échoué. Vérifiez votre réseau puis réessayez.";
