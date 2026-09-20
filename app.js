@@ -105,16 +105,16 @@ function populateSelect(selectEl, items, labelFn, valueFn) {
   });
 }
 
-const TYPES_AVEC_PROMOTION = ["AS", "IDE"];  // seuls ces types demandent une promotion
+const TYPES_AVEC_PROMOTION_SEMESTRE = ["AS", "IDE", "CDS"];  // seuls ces types demandent promotion ET semestre
 
 els.type_formation.addEventListener("change", () => {
   const typeId = Number(els.type_formation.value);
   const typeInfo = state.refs.typesFormation.find(t => t.id === typeId);
-  const requiresPromotion = !!typeInfo && TYPES_AVEC_PROMOTION.includes((typeInfo.libelle || "").trim());
+  const concerne = !!typeInfo && TYPES_AVEC_PROMOTION_SEMESTRE.includes((typeInfo.libelle || "").trim());
 
-  // --- Promotion : uniquement pour AS/IDE ---
+  // --- Promotion : uniquement pour AS/IDE/CDS ---
   els.promotion.innerHTML = "";
-  if (!requiresPromotion) {
+  if (!concerne) {
     const opt = document.createElement("option");
     opt.textContent = "Non applicable pour ce type de formation";
     opt.disabled = true;
@@ -145,27 +145,37 @@ els.type_formation.addEventListener("change", () => {
     }
   }
 
-  // --- Semestre : dépend toujours du type de formation, pour toutes les formations ---
+  // --- Semestre : uniquement pour AS/IDE/CDS, comme la promotion ---
   els.semestre.innerHTML = "";
-  const filteredSemestres = state.refs.semestres.filter(s => s.type_formation_id === typeId);
-  if (!filteredSemestres.length) {
+  if (!concerne) {
     const opt = document.createElement("option");
-    opt.textContent = "Aucun semestre configuré pour ce type de formation";
+    opt.textContent = "Non applicable pour ce type de formation";
     opt.disabled = true;
     opt.selected = true;
     els.semestre.appendChild(opt);
     els.semestre.disabled = true;
     els.semestre.required = false;
   } else {
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.disabled = true;
-    placeholder.selected = true;
-    placeholder.textContent = "Choisir…";
-    els.semestre.appendChild(placeholder);
-    populateSelect(els.semestre, filteredSemestres, s => s.libelle, s => s.id);
-    els.semestre.disabled = false;
-    els.semestre.required = true;
+    const filteredSemestres = state.refs.semestres.filter(s => s.type_formation_id === typeId);
+    if (!filteredSemestres.length) {
+      const opt = document.createElement("option");
+      opt.textContent = "Aucun semestre configuré pour ce type de formation";
+      opt.disabled = true;
+      opt.selected = true;
+      els.semestre.appendChild(opt);
+      els.semestre.disabled = true;
+      els.semestre.required = false;
+    } else {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = "Choisir…";
+      els.semestre.appendChild(placeholder);
+      populateSelect(els.semestre, filteredSemestres, s => s.libelle, s => s.id);
+      els.semestre.disabled = false;
+      els.semestre.required = true;
+    }
   }
 });
 
@@ -299,7 +309,7 @@ els.form_identification.addEventListener("submit", async (e) => {
 
   state.identification = {
     ...identificationCandidate,
-    semestre_id: Number(els.semestre.value),
+    semestre_id: els.semestre.disabled ? null : Number(els.semestre.value),
     etablissement_origine: els.etablissement_origine.value.trim(),
     questionnaire_version_id: state.refs.questionnaireVersionId
   };
