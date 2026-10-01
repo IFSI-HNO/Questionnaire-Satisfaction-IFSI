@@ -116,6 +116,7 @@ els.type_formation.addEventListener("change", () => {
   els.promotion.innerHTML = "";
   if (!concerne) {
     const opt = document.createElement("option");
+    opt.value = "";
     opt.textContent = "Non applicable pour ce type de formation";
     opt.disabled = true;
     opt.selected = true;
@@ -126,6 +127,7 @@ els.type_formation.addEventListener("change", () => {
     const filteredPromotions = state.refs.promotions.filter(p => p.type_formation_id === typeId);
     if (!filteredPromotions.length) {
       const opt = document.createElement("option");
+      opt.value = "";
       opt.textContent = "Aucune promotion configurée pour ce type de formation";
       opt.disabled = true;
       opt.selected = true;
@@ -149,6 +151,7 @@ els.type_formation.addEventListener("change", () => {
   els.semestre.innerHTML = "";
   if (!concerne) {
     const opt = document.createElement("option");
+    opt.value = "";
     opt.textContent = "Non applicable pour ce type de formation";
     opt.disabled = true;
     opt.selected = true;
@@ -159,6 +162,7 @@ els.type_formation.addEventListener("change", () => {
     const filteredSemestres = state.refs.semestres.filter(s => s.type_formation_id === typeId);
     if (!filteredSemestres.length) {
       const opt = document.createElement("option");
+      opt.value = "";
       opt.textContent = "Aucun semestre configuré pour ce type de formation";
       opt.disabled = true;
       opt.selected = true;
@@ -185,6 +189,7 @@ els.etablissement_stage.addEventListener("change", () => {
   els.service.innerHTML = "";
   if (!filtered.length) {
     const opt = document.createElement("option");
+    opt.value = "";
     opt.textContent = "Aucun service configuré pour cet établissement";
     opt.disabled = true;
     opt.selected = true;
@@ -267,6 +272,23 @@ els.form_identification.addEventListener("submit", async (e) => {
 
   if (fin < debut) {
     els["identification-error"].textContent = "La date de fin de stage doit être postérieure à la date de début.";
+    els["identification-error"].hidden = false;
+    return;
+  }
+
+  // Garde-fou explicite : un champ désactivé (ex: "Aucun service configuré...") échappe à la
+  // validation "required" du navigateur. Sans ce contrôle, le texte du message pouvait être
+  // envoyé à la place d'un identifiant, provoquant une erreur d'enregistrement. Établissement
+  // et service restent obligatoires pour tout le monde, contrairement à promotion/semestre.
+  if (els.etablissement_stage.disabled || !els.etablissement_stage.value) {
+    els["identification-error"].textContent = "Sélectionner un établissement de stage avant de continuer.";
+    els["identification-error"].hidden = false;
+    return;
+  }
+  if (els.service.disabled || !els.service.value) {
+    els["identification-error"].textContent =
+      "Aucun service n'est configuré pour cet établissement — impossible de continuer. " +
+      "Merci de signaler ce cas à l'IFSI pour qu'un service soit ajouté dans le logiciel.";
     els["identification-error"].hidden = false;
     return;
   }
