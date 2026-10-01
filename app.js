@@ -188,13 +188,17 @@ els.etablissement_stage.addEventListener("change", () => {
   const filtered = state.refs.services.filter(s => s.etablissement_id === etabId);
   els.service.innerHTML = "";
   if (!filtered.length) {
+    // Pas un oubli de saisie : certains établissements n'ont structurellement aucun
+    // sous-service. Le champ devient facultatif, pas bloquant (comme promotion/semestre
+    // pour les formations non concernées).
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "Aucun service configuré pour cet établissement";
+    opt.textContent = "Aucun service à renseigner pour cet établissement";
     opt.disabled = true;
     opt.selected = true;
     els.service.appendChild(opt);
     els.service.disabled = true;
+    els.service.required = false;
     return;
   }
   const placeholder = document.createElement("option");
@@ -205,6 +209,7 @@ els.etablissement_stage.addEventListener("change", () => {
   els.service.appendChild(placeholder);
   populateSelect(els.service, filtered, s => s.nom, s => s.id);
   els.service.disabled = false;
+  els.service.required = true;
 });
 
 /* ============================================================
@@ -276,19 +281,12 @@ els.form_identification.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Garde-fou explicite : un champ désactivé (ex: "Aucun service configuré...") échappe à la
-  // validation "required" du navigateur. Sans ce contrôle, le texte du message pouvait être
-  // envoyé à la place d'un identifiant, provoquant une erreur d'enregistrement. Établissement
-  // et service restent obligatoires pour tout le monde, contrairement à promotion/semestre.
-  if (els.etablissement_stage.disabled || !els.etablissement_stage.value) {
+  // Garde-fou : établissement reste obligatoire pour tout le monde (jamais désactivé,
+  // mais contrôle de sécurité au cas où). Service, lui, est facultatif quand aucun
+  // sous-service n'existe pour l'établissement choisi — géré via "disabled ? null : ...",
+  // comme promotion/semestre pour les formations non concernées.
+  if (!els.etablissement_stage.value) {
     els["identification-error"].textContent = "Sélectionner un établissement de stage avant de continuer.";
-    els["identification-error"].hidden = false;
-    return;
-  }
-  if (els.service.disabled || !els.service.value) {
-    els["identification-error"].textContent =
-      "Aucun service n'est configuré pour cet établissement — impossible de continuer. " +
-      "Merci de signaler ce cas à l'IFSI pour qu'un service soit ajouté dans le logiciel.";
     els["identification-error"].hidden = false;
     return;
   }
@@ -300,7 +298,7 @@ els.form_identification.addEventListener("submit", async (e) => {
     date_debut_stage: debut,
     date_fin_stage: fin,
     etablissement_stage_id: Number(els.etablissement_stage.value),
-    service_id: Number(els.service.value),
+    service_id: els.service.disabled ? null : Number(els.service.value),
   };
   const signature = signatureDuStage(identificationCandidate);
   if (stagesCompletes().includes(signature)) {
