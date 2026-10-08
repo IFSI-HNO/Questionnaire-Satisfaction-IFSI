@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilan — Questionnaire de satisfaction IFSI</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  .bilan-body{ max-width: 900px; margin: 0 auto; padding: 1rem 1rem 3rem; }
+  .bilan-filters{ background: var(--surface); border-radius: var(--radius); padding: 1.1rem; margin-bottom: 1.2rem; box-shadow: 0 1px 2px rgba(20,47,99,0.08); }
+  .bilan-filters__row{ display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: flex-end; }
+  .bilan-field{ flex: 1; min-width: 160px; }
+  .bilan-field label{ display:block; font-size:0.8rem; color: var(--text-muted); margin-bottom:0.3rem; }
+  .bilan-field select, .bilan-field input{ width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; font-size:0.95rem; }
+  .bilan-card{ background: var(--surface); border-top: 3px solid var(--primary); border-radius: var(--radius); padding: 1.2rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(20,47,99,0.08); }
+  .bilan-card h3{ font-family: var(--font-display); font-size: 1.05rem; color: var(--primary-dark); margin: 0 0 0.8rem; }
+  .bilan-summary{ color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .bilan-comment{ border-top: 1px solid var(--border); padding: 0.5rem 0; font-size: 0.92rem; }
+  #password-screen{ max-width: 360px; margin: 3rem auto; text-align:center; }
+  #password-screen input{ width:100%; padding:0.7rem; margin: 1rem 0; border:1px solid var(--border); border-radius:4px; font-size:1rem; }
+  #password-error{ color: var(--error); font-size:0.9rem; min-height:1.2em; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="brand-banner" role="img" aria-label="Institut de Formations en Santé — Hôpitaux Nord-Ouest"></div>
+  <header class="app-header">
+    <span class="app-header__title">Bilan du questionnaire — accès formateurs</span>
+  </header>
+
+  <section id="password-screen">
+    <div class="card">
+      <h1>Accès réservé</h1>
+      <p class="intro">Cette page affiche les statistiques du questionnaire de satisfaction. Saisis le mot de passe communiqué par l'IFSI.</p>
+      <input type="password" id="password-input" placeholder="Mot de passe" autocomplete="off">
+      <p id="password-error"></p>
+      <button class="btn btn--primary" id="btn-password">Accéder au bilan</button>
+    </div>
+  </section>
+
+  <section id="bilan-content" class="bilan-body" hidden>
+
+    <div class="bilan-filters">
+      <div class="bilan-filters__row">
+        <div class="bilan-field">
+          <label>Du</label>
+          <input type="date" id="f-date-debut">
+        </div>
+        <div class="bilan-field">
+          <label>Au</label>
+          <input type="date" id="f-date-fin">
+        </div>
+        <div class="bilan-field">
+          <label>Type de formation</label>
+          <select id="f-type-formation"><option value="">Tous</option></select>
+        </div>
+        <div class="bilan-field">
+          <label>Établissement</label>
+          <select id="f-etablissement"><option value="">Tous</option></select>
+        </div>
+        <div class="bilan-field" style="flex:0;">
+          <button class="btn btn--primary" id="btn-generer" style="white-space:nowrap;">Afficher le bilan</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="bilan-summary" id="bilan-summary"></p>
+    <div id="bilan-results"></div>
+  </section>
+
+</div>
+
+<script src="config.js"></script>
+<script src="bilan.js"></script>
+</body>
+</html>
