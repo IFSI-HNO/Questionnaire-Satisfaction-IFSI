@@ -99,7 +99,22 @@ document.getElementById("f-etablissement").addEventListener("change", () => {
 });
 
 document.getElementById("btn-generer").addEventListener("click", genererBilan);
-document.getElementById("btn-pdf").addEventListener("click", () => window.print());
+/* Impression / PDF : chaque graphique est figé en image avant d'imprimer. Imprimer un <canvas>
+   « responsive » le déforme (graphiques géants sur des dizaines de pages) ; une image à largeur
+   fixe garde exactement la mise en page de l'écran. */
+function versImages() {
+  document.querySelectorAll(".bilan-card canvas").forEach(cv => {
+    if (cv.nextElementSibling && cv.nextElementSibling.classList.contains("print-img")) return;
+    const img = new Image();
+    img.className = "print-img";
+    img.src = cv.toDataURL("image/png");
+    cv.after(img);
+  });
+}
+function retirerImages() { document.querySelectorAll(".print-img").forEach(i => i.remove()); }
+window.addEventListener("beforeprint", versImages);
+window.addEventListener("afterprint", retirerImages);
+document.getElementById("btn-pdf").addEventListener("click", () => { versImages(); window.print(); });
 
 function libelleSelect(id) {
   const sel = document.getElementById(id);
@@ -145,7 +160,9 @@ async function genererBilan() {
 
   const periode = (d1 || d2) ? `du ${fmtDate(d1) || "…"} au ${fmtDate(d2) || "…"}` : "toutes périodes";
   document.getElementById("print-recap").textContent =
-    `Période : ${periode} — Formation : ${libelleSelect("f-type-formation")} — Établissement : ${libelleSelect("f-etablissement")} — Service : ${libelleSelect("f-service")} — ${sessionsUniques.size} questionnaire(s)`;
+    `Période : ${periode}\nType de formation : ${libelleSelect("f-type-formation")}\n` +
+    `Établissement : ${libelleSelect("f-etablissement")}\nService : ${libelleSelect("f-service")}\n` +
+    `${sessionsUniques.size} questionnaire(s) pris en compte`;
   document.getElementById("print-date").textContent = "Édité le " + new Date().toLocaleDateString("fr-FR");
   document.getElementById("btn-pdf").disabled = !filtered.length;
 
@@ -190,9 +207,16 @@ function afficherCommentaires(container, texte, valeurs) {
 function afficherGraphique(container, q, valeurs) {
   const counts = new Map();
   if (q.type_reponse === "choix_multiple") {
-    valeurs.forEach(v => v.split(",").map(s => s.trim()).filter(Boolean).forEach(opt => {
-      counts.set(opt, (counts.get(opt) || 0) + 1);
-    }));
+    const configures = ((q.options && q.options.choix) || []).slice().sort((a, b) => b.length - a.length);
+    valeurs.forEach(v => {
+      let reste = v;
+      configures.forEach(opt => {            // d'abord les libellés configurés (peuvent contenir des virgules)
+        if (reste.includes(opt)) { counts.set(opt, (counts.get(opt) || 0) + 1); reste = reste.split(opt).join(""); }
+      });
+      reste.split(",").map(s => s.trim()).filter(Boolean).forEach(opt => {
+        counts.set(opt, (counts.get(opt) || 0) + 1);
+      });
+    });
   } else {
     valeurs.forEach(v => { if (v) counts.set(v, (counts.get(v) || 0) + 1); });
   }
@@ -245,7 +269,7 @@ function afficherGraphique(container, q, valeurs) {
       type: "pie",
       data: { labels, datasets: [{ data, backgroundColor: colors }] },
       options: {
-        responsive: true, maintainAspectRatio: true, animation: false,
+        responsive: true, maintainAspectRatio: true, animation: false, devicePixelRatio: 2,
         plugins: { legend: { display: false },
                    tooltip: { callbacks: { label: c => ` ${c.label} : ${c.raw} (${Math.round(100 * c.raw / total)} %)` } } }
       }
@@ -264,15 +288,21 @@ function afficherGraphique(container, q, valeurs) {
     if (cur) lines.push(cur);
     return lines;
   };
+  // Hauteur fixe, calculée d'après le nombre de lignes des libellés : indispensable pour que
+  // l'impression ne déforme pas le graphique (sinon il s'étire sur des dizaines de pages).
+  const nbLignes = labels.reduce((n, l) => n + Math.max(1, wrapLabel(l).length), 0);
+  const box = document.createElement("div");
+  box.className = "bar-box";
+  box.style.height = (60 + nbLignes * 20 + labels.length * 18) + "px";
   const canvas = document.createElement("canvas");
-  canvas.style.height = Math.max(180, 56 * labels.length) + "px";
-  card.appendChild(canvas);
+  box.appendChild(canvas);
+  card.appendChild(box);
   container.appendChild(card);
   charts.push(new Chart(canvas, {
     type: "bar",
     data: { labels: labels.map(l => wrapLabel(l)), datasets: [{ data, backgroundColor: colors }] },
     options: {
-      indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+      indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 2,
       plugins: { legend: { display: false },
                  tooltip: { callbacks: { label: c => ` ${c.raw} (${Math.round(100 * c.raw / total)} %)` } } },
       scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 11 } } } }

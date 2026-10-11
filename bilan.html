@@ -21,6 +21,9 @@
   #password-screen{ max-width: 360px; margin: 3rem auto; text-align:center; }
   #password-screen input{ width:100%; padding:0.7rem; margin: 1rem 0; border:1px solid var(--border); border-radius:4px; font-size:1rem; }
   #password-error{ color: var(--error); font-size:0.9rem; min-height:1.2em; }
+  .print-img{ display:none; width:100%; height:auto; }
+  #print-recap{ white-space: pre-line; }
+  .bar-box{ position:relative; width:100%; }
   .pie-row{ display:flex; align-items:center; gap:1.2rem; }
   .pie-canvas{ flex:0 0 38%; max-width:260px; }
   .pie-legend{ list-style:none; margin:0; padding:0; flex:1; font-size:0.9rem; }
@@ -36,6 +39,12 @@
     #bilan-print-header h1{ font-size:18pt; margin:0 0 4px; }
     #bilan-print-header p{ margin:2px 0; font-size:10pt; color:#444; }
     .bilan-body{ max-width:none; padding:0; }
+    .bilan-card canvas{ display:none !important; }
+    .print-img{ display:block !important; }
+    .bar-box{ height:auto !important; }
+    .bilan-summary{ display:none; }
+    .pie-canvas{ flex:0 0 2.2in; max-width:2.2in; }
+    .pie-legend{ font-size:9pt; }
     .bilan-card{ break-inside: avoid; box-shadow:none; border:1px solid #ccc; border-top:3px solid #1E4591; }
   }
 </style>
