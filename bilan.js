@@ -216,20 +216,66 @@ function afficherGraphique(container, q, valeurs) {
   const card = document.createElement("div");
   card.className = "bilan-card";
   card.innerHTML = `<h3>${q.texte}</h3>`;
+  const total = data.reduce((a, b) => a + b, 0) || 1;
+
+  if (kind === "pie") {
+    // Camembert à gauche, légende HTML à droite : libellés complets, sur plusieurs lignes
+    const row = document.createElement("div");
+    row.className = "pie-row";
+    const wrap = document.createElement("div");
+    wrap.className = "pie-canvas";
+    const canvas = document.createElement("canvas");
+    wrap.appendChild(canvas);
+    const legend = document.createElement("ul");
+    legend.className = "pie-legend";
+    labels.forEach((l, i) => {
+      const li = document.createElement("li");
+      const sw = document.createElement("span");
+      sw.className = "pie-swatch";
+      sw.style.background = colors[i];
+      li.appendChild(sw);
+      li.appendChild(document.createTextNode(` ${l} (${data[i]})`));
+      legend.appendChild(li);
+    });
+    row.appendChild(wrap);
+    row.appendChild(legend);
+    card.appendChild(row);
+    container.appendChild(card);
+    charts.push(new Chart(canvas, {
+      type: "pie",
+      data: { labels, datasets: [{ data, backgroundColor: colors }] },
+      options: {
+        responsive: true, maintainAspectRatio: true, animation: false,
+        plugins: { legend: { display: false },
+                   tooltip: { callbacks: { label: c => ` ${c.label} : ${c.raw} (${Math.round(100 * c.raw / total)} %)` } } }
+      }
+    }));
+    return;
+  }
+
+  // Histogramme horizontal : libellés complets renvoyés à la ligne
+  const wrapLabel = (txt, n = 38) => {
+    const words = String(txt).split(" "), lines = [];
+    let cur = "";
+    words.forEach(w => {
+      if ((cur + " " + w).trim().length > n && cur) { lines.push(cur); cur = w; }
+      else cur = (cur + " " + w).trim();
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  };
   const canvas = document.createElement("canvas");
-  canvas.style.maxHeight = "320px";
+  canvas.style.height = Math.max(180, 56 * labels.length) + "px";
   card.appendChild(canvas);
   container.appendChild(card);
-
-  const chart = new Chart(canvas, {
-    type: kind,
-    data: { labels, datasets: [{ data, backgroundColor: colors }] },
+  charts.push(new Chart(canvas, {
+    type: "bar",
+    data: { labels: labels.map(l => wrapLabel(l)), datasets: [{ data, backgroundColor: colors }] },
     options: {
-      responsive: true,
-      animation: false,
-      plugins: { legend: { display: kind === "pie", position: "right" } },
-      scales: kind === "bar" ? { y: { beginAtZero: true, ticks: { precision: 0 } } } : undefined
+      indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => ` ${c.raw} (${Math.round(100 * c.raw / total)} %)` } } },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 11 } } } }
     }
-  });
-  charts.push(chart);
+  }));
 }
