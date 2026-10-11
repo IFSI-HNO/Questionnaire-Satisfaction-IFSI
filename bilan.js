@@ -1,8 +1,7 @@
 "use strict";
 
-/* Mot de passe simple côté client — un frein, pas un vrai coffre-fort
-   (voir l'échange avec l'IFSI à ce sujet). À changer ici si besoin. */
-const MOT_DE_PASSE_BILAN = "IFS";
+/* Le mot de passe est vérifié côté base (fonction verifier_mot_de_passe_bilan)
+   et se change depuis le logiciel d'administration. Un frein, pas un coffre-fort. */
 
 const CHART_COLORS = ["#1E4591", "#268AE9", "#6FA8DC", "#9FC5E8", "#C9DAF8", "#B4802F", "#D9A566", "#7FB3D5"];
 
@@ -17,7 +16,7 @@ const Supa = {
   }
 };
 
-const refs = { typesFormation: [], etablissements: [] };
+const refs = { typesFormation: [], etablissements: [], services: [] };
 let charts = [];
 
 /* ---------------- Mot de passe ---------------- */
@@ -26,23 +25,37 @@ document.getElementById("password-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") verifierMotDePasse();
 });
 
-function verifierMotDePasse() {
+async function verifierMotDePasse() {
   const saisi = document.getElementById("password-input").value;
-  if (saisi === MOT_DE_PASSE_BILAN) {
-    document.getElementById("password-screen").hidden = true;
-    document.getElementById("bilan-content").hidden = false;
-    chargerFiltres();
-  } else {
-    document.getElementById("password-error").textContent = "Mot de passe incorrect.";
+  const err = document.getElementById("password-error");
+  err.textContent = "";
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/rpc/verifier_mot_de_passe_bilan`, {
+      method: "POST",
+      headers: { ...Supa.headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({ mdp: saisi })
+    });
+    if (!res.ok) throw new Error();
+    if ((await res.json()) === true) {
+      document.getElementById("password-screen").hidden = true;
+      document.getElementById("bilan-content").hidden = false;
+      chargerFiltres();
+    } else {
+      err.textContent = "Mot de passe incorrect.";
+    }
+  } catch (e) {
+    err.textContent = "Vérification impossible. Vérifie ta connexion.";
   }
 }
 
 /* ---------------- Chargement des filtres ---------------- */
 async function chargerFiltres() {
-  const [typesFormation, etablissements] = await Promise.all([
+  const [typesFormation, etablissements, services] = await Promise.all([
     Supa.select("types_formation", "select=id,libelle&actif=eq.true&order=libelle.asc"),
     Supa.select("etablissements", "select=id,nom&actif=eq.true&order=nom.asc"),
+    Supa.select("services", "select=id,etablissement_id,nom&actif=eq.true&order=nom.asc"),
   ]);
+  refs.services = services;
   refs.typesFormation = typesFormation;
   refs.etablissements = etablissements;
 
@@ -63,7 +76,36 @@ async function chargerFiltres() {
   genererBilan();
 }
 
+document.getElementById("f-etablissement").addEventListener("change", () => {
+  const sel = document.getElementById("f-service");
+  const etabId = Number(document.getElementById("f-etablissement").value);
+  sel.innerHTML = "";
+  const tous = document.createElement("option");
+  tous.value = "";
+  if (!etabId) {
+    tous.textContent = "Tous (choisir d'abord un établissement)";
+    sel.appendChild(tous);
+    sel.disabled = true;
+    return;
+  }
+  tous.textContent = "Tous";
+  sel.appendChild(tous);
+  refs.services.filter(s => s.etablissement_id === etabId).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.nom;
+    sel.appendChild(opt);
+  });
+  sel.disabled = false;
+});
+
 document.getElementById("btn-generer").addEventListener("click", genererBilan);
+document.getElementById("btn-pdf").addEventListener("click", () => window.print());
+
+function libelleSelect(id) {
+  const sel = document.getElementById(id);
+  return sel.value ? sel.options[sel.selectedIndex].textContent : "Tous";
+}
+function fmtDate(iso) { return iso ? iso.split("-").reverse().join("/") : ""; }
 
 /* ---------------- Génération du bilan ---------------- */
 async function genererBilan() {
@@ -71,13 +113,14 @@ async function genererBilan() {
   const d2 = document.getElementById("f-date-fin").value;
   const typeId = document.getElementById("f-type-formation").value;
   const etabId = document.getElementById("f-etablissement").value;
+  const servId = document.getElementById("f-service").value;
 
   let rows;
   try {
     rows = await Supa.select(
       "reponses_details",
-      "select=valeur,questions(ordre,texte,type_reponse,options)," +
-      "sessions_reponses(horodatage_soumission,etablissement_stage_id,type_formation_id)"
+      "select=session_reponse_id,valeur,questions(ordre,texte,type_reponse,options)," +
+      "sessions_reponses(horodatage_soumission,etablissement_stage_id,service_id,type_formation_id)"
     );
   } catch (err) {
     document.getElementById("bilan-summary").textContent = "Erreur de chargement : " + err.message;
@@ -92,12 +135,19 @@ async function genererBilan() {
     if (d2 && jour > d2) return false;
     if (typeId && String(s.type_formation_id) !== typeId) return false;
     if (etabId && String(s.etablissement_stage_id) !== etabId) return false;
+    if (servId && String(s.service_id) !== servId) return false;
     return true;
   });
 
-  const sessionsUniques = new Set(filtered.map(r => (r.sessions_reponses || {}).horodatage_soumission));
+  const sessionsUniques = new Set(filtered.map(r => r.session_reponse_id));
   document.getElementById("bilan-summary").textContent =
     filtered.length ? `${sessionsUniques.size} questionnaire(s) pris en compte.` : "Aucune réponse pour cette sélection.";
+
+  const periode = (d1 || d2) ? `du ${fmtDate(d1) || "…"} au ${fmtDate(d2) || "…"}` : "toutes périodes";
+  document.getElementById("print-recap").textContent =
+    `Période : ${periode} — Formation : ${libelleSelect("f-type-formation")} — Établissement : ${libelleSelect("f-etablissement")} — Service : ${libelleSelect("f-service")} — ${sessionsUniques.size} questionnaire(s)`;
+  document.getElementById("print-date").textContent = "Édité le " + new Date().toLocaleDateString("fr-FR");
+  document.getElementById("btn-pdf").disabled = !filtered.length;
 
   charts.forEach(c => c.destroy());
   charts = [];
@@ -176,6 +226,7 @@ function afficherGraphique(container, q, valeurs) {
     data: { labels, datasets: [{ data, backgroundColor: colors }] },
     options: {
       responsive: true,
+      animation: false,
       plugins: { legend: { display: kind === "pie", position: "right" } },
       scales: kind === "bar" ? { y: { beginAtZero: true, ticks: { precision: 0 } } } : undefined
     }

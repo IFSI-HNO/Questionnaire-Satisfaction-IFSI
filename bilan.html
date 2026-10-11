@@ -21,6 +21,18 @@
   #password-screen{ max-width: 360px; margin: 3rem auto; text-align:center; }
   #password-screen input{ width:100%; padding:0.7rem; margin: 1rem 0; border:1px solid var(--border); border-radius:4px; font-size:1rem; }
   #password-error{ color: var(--error); font-size:0.9rem; min-height:1.2em; }
+  .bilan-actions{ display:flex; justify-content:flex-end; margin-bottom:0.8rem; }
+  #bilan-print-header{ display:none; }
+  @media print{
+    @page{ size: A4; margin: 14mm; }
+    body{ background:#fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .brand-banner, .app-header, .bilan-filters, .bilan-actions, #password-screen{ display:none !important; }
+    #bilan-print-header{ display:block; margin-bottom:12px; }
+    #bilan-print-header h1{ font-size:18pt; margin:0 0 4px; }
+    #bilan-print-header p{ margin:2px 0; font-size:10pt; color:#444; }
+    .bilan-body{ max-width:none; padding:0; }
+    .bilan-card{ break-inside: avoid; box-shadow:none; border:1px solid #ccc; border-top:3px solid #1E4591; }
+  }
 </style>
 </head>
 <body>
@@ -61,12 +73,23 @@
           <label>Établissement</label>
           <select id="f-etablissement"><option value="">Tous</option></select>
         </div>
+        <div class="bilan-field">
+          <label>Service</label>
+          <select id="f-service" disabled><option value="">Tous (choisir d'abord un établissement)</option></select>
+        </div>
         <div class="bilan-field" style="flex:0;">
           <button class="btn btn--primary" id="btn-generer" style="white-space:nowrap;">Afficher le bilan</button>
         </div>
       </div>
     </div>
 
+    <div class="bilan-actions"><button class="btn btn--primary" id="btn-pdf" disabled>Exporter en PDF</button></div>
+    <div id="bilan-print-header">
+      <h1>Bilan — Questionnaire de satisfaction de stage</h1>
+      <p>Institut de Formations en Santé — Hôpitaux Nord-Ouest</p>
+      <p id="print-recap"></p>
+      <p id="print-date"></p>
+    </div>
     <p class="bilan-summary" id="bilan-summary"></p>
     <div id="bilan-results"></div>
   </section>
