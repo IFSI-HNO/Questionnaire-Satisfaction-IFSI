@@ -344,25 +344,55 @@ els.form_identification.addEventListener("submit", async (e) => {
 /* ============================================================
    Écran 2 : questionnaire, question par question
    ============================================================ */
+/* Questions conditionnelles : une question peut dépendre de la réponse à une question
+   précédente (options.condition = { question_id, valeur }). Si la condition n'est pas remplie,
+   la question est sautée. Une référence introuvable ou placée APRÈS la question est ignorée
+   (la question s'affiche alors toujours), pour ne jamais bloquer le questionnaire. */
+function conditionRemplie(q) {
+  const c = q.options && q.options.condition;
+  if (!c) return true;
+  const qs = state.refs.questions;
+  const refIdx = qs.findIndex(x => String(x.id) === String(c.question_id));
+  const ownIdx = qs.indexOf(q);
+  if (refIdx < 0 || refIdx >= ownIdx) return true;
+  if (!conditionRemplie(qs[refIdx])) return false;   // la question de référence a elle-même été sautée
+  const a = state.answers[qs[refIdx].id];
+  return Array.isArray(a) ? a.includes(c.valeur) : String(a ?? "") === String(c.valeur);
+}
+
+function indicesApplicables() {
+  return state.refs.questions.map((q, i) => (conditionRemplie(q) ? i : -1)).filter(i => i >= 0);
+}
+
+function indexSuivant() {
+  return indicesApplicables().find(i => i > state.currentQuestionIndex);
+}
+
+function indexPrecedent() {
+  const l = indicesApplicables().filter(i => i < state.currentQuestionIndex);
+  return l.length ? l[l.length - 1] : undefined;
+}
+
 function renderProgress() {
-  const total = state.refs.questions.length;
-  const current = state.currentQuestionIndex;
+  const liste = indicesApplicables();
+  const total = liste.length;
+  const position = Math.max(0, liste.indexOf(state.currentQuestionIndex));
   els["progress-ticks"].innerHTML = "";
   for (let i = 0; i < total; i++) {
     const tick = document.createElement("div");
-    tick.className = "tick" + (i <= current ? " filled" : "");
+    tick.className = "tick" + (i <= position ? " filled" : "");
     els["progress-ticks"].appendChild(tick);
   }
-  els["progress-label"].textContent = `Question ${current + 1} / ${total}`;
+  els["progress-label"].textContent = `Question ${position + 1} / ${total}`;
 }
 
 function renderQuestion() {
   const q = state.refs.questions[state.currentQuestionIndex];
   els["question-text"].textContent = q.texte;
   els["question-error"].hidden = true;
-  els["btn-prev"].style.visibility = state.currentQuestionIndex === 0 ? "hidden" : "visible";
+  els["btn-prev"].style.visibility = indexPrecedent() === undefined ? "hidden" : "visible";
   els["btn-next"].textContent =
-    state.currentQuestionIndex === state.refs.questions.length - 1 ? "Valider le questionnaire" : "Question suivante";
+    indexSuivant() === undefined ? "Valider le questionnaire" : "Question suivante";
 
   const container = els["question-input"];
   container.innerHTML = "";
@@ -438,8 +468,9 @@ function currentAnswerIsValid() {
 }
 
 els["btn-prev"].addEventListener("click", () => {
-  if (state.currentQuestionIndex === 0) return;
-  state.currentQuestionIndex -= 1;
+  const prev = indexPrecedent();
+  if (prev === undefined) return;
+  state.currentQuestionIndex = prev;
   renderQuestion();
 });
 
@@ -449,8 +480,9 @@ els["btn-next"].addEventListener("click", async () => {
     els["question-error"].hidden = false;
     return;
   }
-  if (state.currentQuestionIndex < state.refs.questions.length - 1) {
-    state.currentQuestionIndex += 1;
+  const next = indexSuivant();
+  if (next !== undefined) {
+    state.currentQuestionIndex = next;
     renderQuestion();
   } else {
     await submitQuestionnaire();
@@ -465,11 +497,16 @@ async function submitQuestionnaire() {
   try {
     const sessionId = crypto.randomUUID();
     await Supa.insert("sessions_reponses", [{ id: sessionId, ...state.identification }]);
-    const details = state.refs.questions.map(q => ({
-      session_reponse_id: sessionId,
-      question_id: q.id,
-      valeur: Array.isArray(state.answers[q.id]) ? state.answers[q.id].join(", ") : String(state.answers[q.id] ?? "")
-    }));
+    // Une question sautée (condition non remplie) est enregistrée vide : elle ne compte pas
+    // dans les statistiques, et une réponse saisie avant un changement d'avis est écartée.
+    const details = state.refs.questions.map(q => {
+      const reponse = conditionRemplie(q) ? state.answers[q.id] : undefined;
+      return {
+        session_reponse_id: sessionId,
+        question_id: q.id,
+        valeur: Array.isArray(reponse) ? reponse.join(", ") : String(reponse ?? "")
+      };
+    });
     await Supa.insert("reponses_details", details);
     marquerStageComplete(state.stageSignature);
     showScreen("screen-done");
